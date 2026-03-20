@@ -1,0 +1,8 @@
+{
+  "name": "marathon-mode",
+  "description": "Quota-aware autonomous work sessions for Claude Code. Real-time rate limit monitoring, per-task model right-sizing, parallel dispatch with throttled concurrency, and graceful wind-down.",
+  "author": {
+    "name": "1507 Systems",
+    "url": "https://github.com/1507-systems/marathon-mode"
+  }
+}
