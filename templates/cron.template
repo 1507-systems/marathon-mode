@@ -1,0 +1,1 @@
+__MINUTE__ __HOUR__ * * __DAYS__ cd __WORKING_DIR__ && __CLAUDE_PATH__ -p "/marathon --orchestrate --wake-time __WAKE_TIME__ --file __TASKS_FILE__" >> /tmp/marathon-mode.log 2>&1

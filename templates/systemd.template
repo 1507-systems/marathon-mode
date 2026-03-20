@@ -1,0 +1,21 @@
+[Unit]
+Description=Marathon Mode Nightly Run
+
+[Timer]
+OnCalendar=*-*-* __START_HOUR__:__START_MINUTE__:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
+---SERVICE---
+
+[Unit]
+Description=Marathon Mode Session
+
+[Service]
+Type=oneshot
+WorkingDirectory=__WORKING_DIR__
+ExecStart=__CLAUDE_PATH__ -p "/marathon --orchestrate --wake-time __WAKE_TIME__ --file __TASKS_FILE__"
+StandardOutput=journal
+StandardError=journal
