@@ -160,7 +160,8 @@ RESETS_HUMAN=$(fmt_resets "$RESETS_IN_MIN")
 # ---------------------------------------------------------------------------
 # Build the systemMessage based on the new zone
 # ---------------------------------------------------------------------------
-case "${NEW_ZONE^^}" in  # uppercase for case-insensitive match
+NEW_ZONE_UPPER=$(echo "$NEW_ZONE" | tr '[:lower:]' '[:upper:]')
+case "$NEW_ZONE_UPPER" in
   GREEN)
     SYS_MSG="🟢 GREEN: Quota reset. Resuming full speed. ${REMAINING_TASKS} tasks remaining."
     ;;
@@ -186,10 +187,10 @@ esac
 # Send a push notification for YELLOW and above (not GREEN)
 # Run in background so it doesn't block the hook's return
 # ---------------------------------------------------------------------------
-case "${NEW_ZONE^^}" in
+case "$NEW_ZONE_UPPER" in
   YELLOW|ORANGE|RED|COAST)
     "${PLUGIN_ROOT}/scripts/notify.sh" \
-      "Marathon Mode — Zone: ${NEW_ZONE^^}" \
+      "Marathon Mode — Zone: ${NEW_ZONE_UPPER}" \
       "$SYS_MSG" \
       "$CWD" &>/dev/null &
     ;;

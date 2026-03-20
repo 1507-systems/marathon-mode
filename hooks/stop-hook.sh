@@ -97,7 +97,7 @@ fi
 # tomorrow's time.
 # ---------------------------------------------------------------------------
 
-if [[ -n "$WAKE_TIME" ]]; then
+if [[ -n "$WAKE_TIME" && "$WAKE_TIME" != "null" ]]; then
   NOW_H=$(date +%H)
   NOW_M=$(date +%M)
   NOW_TOTAL=$(( (10#$NOW_H * 60) + 10#$NOW_M ))
