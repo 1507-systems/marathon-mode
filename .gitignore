@@ -1,0 +1,15 @@
+# Marathon Mode state files (session-specific, not committed)
+.claude/marathon.local.md
+.claude/marathon-config.local.md
+.claude/marathon-tasks.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
