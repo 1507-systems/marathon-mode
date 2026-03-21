@@ -1,7 +1,7 @@
 ---
 description: "Build a prioritized task list for marathon execution"
 argument-hint: "[--source path] [--scan]"
-allowed-tools: ["Bash", "Read", "Write", "Glob", "Grep", "Agent"]
+allowed-tools: Bash, Read, Write, Glob, Grep, Agent
 ---
 
 # /marathon-tasks — Build a Task List

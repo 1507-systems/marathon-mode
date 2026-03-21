@@ -1,7 +1,7 @@
 ---
 description: "Start a marathon session — quota-aware autonomous work"
 argument-hint: "[--file path] [--orchestrate] [--wake-time HH:MM]"
-allowed-tools: ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)", "Read", "Write", "Edit", "Glob", "Grep", "Agent"]
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Read, Write, Edit, Glob, Grep, Agent
 ---
 
 # /marathon — Start a Marathon Session

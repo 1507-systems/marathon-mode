@@ -1,6 +1,6 @@
 ---
 description: "Gracefully stop the current marathon session"
-allowed-tools: ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)", "Read", "Write", "Edit"]
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Read, Write, Edit
 ---
 
 # /marathon-stop — Graceful Wind-Down

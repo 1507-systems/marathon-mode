@@ -1,0 +1,14 @@
+{
+  "name": "marathon-local",
+  "owner": {
+    "name": "1507 Systems"
+  },
+  "plugins": [
+    {
+      "name": "marathon-mode",
+      "source": "./",
+      "description": "Quota-aware autonomous work sessions for Claude Code",
+      "version": "1.0.0"
+    }
+  ]
+}

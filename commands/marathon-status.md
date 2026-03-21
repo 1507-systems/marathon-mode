@@ -1,6 +1,6 @@
 ---
 description: "Show current marathon state and quota"
-allowed-tools: ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)", "Read"]
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Read
 ---
 
 # /marathon-status — Check Marathon State

@@ -1,7 +1,7 @@
 ---
 description: "Generate and install scheduler configs for automated marathon runs"
 argument-hint: "[--platform auto|macos|linux|cron] [--start HH:MM] [--stop HH:MM] [--days weekdays|daily] [--regenerate] [--uninstall]"
-allowed-tools: ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*)", "Read", "Write", "Edit"]
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Read, Write, Edit
 ---
 
 # /marathon-schedule — Schedule Automated Runs
