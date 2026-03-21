@@ -69,7 +69,7 @@ The plugin registers two hooks automatically: a `PostToolUse` quota monitor and 
 | `/marathon-tasks` | `[--scan] [--source path]` | Build a prioritized task checklist for marathon execution |
 | `/marathon-status` | — | Show live session state: current task, quota zone, progress counts |
 | `/marathon-stop` | — | Graceful wind-down: commit WIP, push, notify, clean up state |
-| `/marathon-schedule` | `[--platform auto\|macos\|linux\|cron] [--start HH:MM] [--stop HH:MM] [--days weekdays\|daily] [--uninstall]` | Generate and install platform-native scheduler configs (launchd / systemd / cron) |
+| `/marathon-schedule` | `[--platform auto\|macos\|linux\|cron] [--start HH:MM] [--stop HH:MM] [--days weekdays\|daily] [--regenerate] [--uninstall]` | Generate and install platform-native scheduler configs (launchd / systemd / cron) |
 
 ---
 
@@ -82,8 +82,8 @@ Zones are computed from the 5-hour usage percentage. The quota monitor fires aft
 | GREEN | < 70% | Full speed. Unlimited parallel dispatch in orchestrate mode. |
 | YELLOW | 70–84% | Sequential only (max 2 parallel). Opus tasks downshift to Sonnet. |
 | ORANGE | 85–94% | Wind-down triggered. Finish current task, commit, push, stop. All models downshift one tier. |
-| RED | >= 95% | Emergency save. Commit WIP immediately, push, notify, halt. Everything runs on Haiku. |
-| COAST | > 95% + reset <= 45 min away | Save state with `<!-- resume_after: -->` marker and exit. Scheduler restarts after reset. |
+| RED | > 95% | Emergency save. Commit WIP immediately, push, notify, halt. Everything runs on Haiku. |
+| COAST | > 95% + reset <= 45 min away (or 429 rate-limited + reset imminent) | Save state with `<!-- resume_after: -->` marker and exit. Scheduler restarts after reset. |
 
 ---
 
