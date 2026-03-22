@@ -5,7 +5,7 @@ description: "Autonomous task dispatch with model right-sizing, parallel executi
 
 # Orchestration Skill
 
-This skill drives the marathon dispatch loop: parsing tasks, building dependency tiers, selecting models, dispatching subagents, and managing wind-down. It is the core execution engine invoked by `/marathon --orchestrate`.
+This skill drives the marathon dispatch loop: parsing tasks, building dependency tiers, selecting models, dispatching subagents, and managing wind-down. It is the core execution engine invoked by `/marathon --orchestrate` (or `/marathon` with the `--orchestrate` flag).
 
 ## 1. Task File Parsing
 
@@ -142,7 +142,7 @@ Wind-down is triggered when any of these conditions are met:
 - `quota_zone` reaches ORANGE or RED
 - `wake_time` is within 30 minutes of the current time
 - All tasks in the task file are complete
-- The user runs `/marathon-stop`
+- The user runs `/marathon stop`
 
 ### Steps
 

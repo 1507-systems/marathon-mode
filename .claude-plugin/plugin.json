@@ -1,5 +1,5 @@
 {
-  "name": "marathon-mode",
+  "name": "marathon",
   "version": "1.0.0",
   "description": "Quota-aware autonomous work sessions for Claude Code. Real-time rate limit monitoring, per-task model right-sizing, parallel dispatch with throttled concurrency, and graceful wind-down.",
   "author": {

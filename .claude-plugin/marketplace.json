@@ -5,7 +5,7 @@
   },
   "plugins": [
     {
-      "name": "marathon-mode",
+      "name": "marathon",
       "source": "./",
       "description": "Quota-aware autonomous work sessions for Claude Code",
       "version": "1.0.0"

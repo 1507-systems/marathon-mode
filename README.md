@@ -38,7 +38,7 @@ The plugin registers two hooks automatically: a `PostToolUse` quota monitor and 
 
 ```bash
 # Build a task list by scanning all git repos in the current directory
-/marathon-tasks --scan
+/marathon tasks --scan
 
 # Review and edit the generated list
 # Edit: .claude/marathon-tasks.md
@@ -53,23 +53,31 @@ The plugin registers two hooks automatically: a `PostToolUse` quota monitor and 
 /marathon --orchestrate --wake-time 07:30
 
 # Check live session status
-/marathon-status
+/marathon status
 
 # Graceful stop (commits WIP, pushes, cleans up)
-/marathon-stop
+/marathon stop
 ```
 
 ---
 
 ## Commands
 
-| Command | Arguments | Description |
-|---|---|---|
-| `/marathon` | `[--file path] [--orchestrate] [--wake-time HH:MM]` | Start a marathon session in advisory or orchestrate mode |
-| `/marathon-tasks` | `[--scan] [--source path]` | Build a prioritized task checklist for marathon execution |
-| `/marathon-status` | — | Show live session state: current task, quota zone, progress counts |
-| `/marathon-stop` | — | Graceful wind-down: commit WIP, push, notify, clean up state |
-| `/marathon-schedule` | `[--platform auto\|macos\|linux\|cron] [--start HH:MM] [--stop HH:MM] [--days weekdays\|daily] [--regenerate] [--uninstall]` | Generate and install platform-native scheduler configs (launchd / systemd / cron) |
+Everything is a single `/marathon` command with subcommands and flags:
+
+| Usage | Description |
+|---|---|
+| `/marathon` | Start advisory session (quota monitoring, you drive) |
+| `/marathon --orchestrate` | Start orchestrate session (autonomous dispatch) |
+| `/marathon --orchestrate --wake-time HH:MM` | Overnight autonomous run with wind-down time |
+| `/marathon --file path` | Start with a specific task file |
+| `/marathon tasks` | Build task list interactively |
+| `/marathon tasks --scan` | Scan repos for TODOs, dirty state, unpushed commits |
+| `/marathon tasks --source path` | Extract tasks from a projects file |
+| `/marathon status` | Show live session state, quota zone, progress |
+| `/marathon stop` | Graceful wind-down: commit WIP, push, notify, clean up |
+| `/marathon schedule` | Generate and install nightly scheduler configs |
+| `/marathon schedule --uninstall` | Remove scheduler config |
 
 ---
 
@@ -155,7 +163,7 @@ Source: scan
 
 ## Configuration
 
-Create `.claude/marathon-config.local.md` in your project to enable notifications and set defaults. This file is read by `notify.sh` and `marathon-schedule`.
+Create `.claude/marathon-config.local.md` in your project to enable notifications and set defaults. This file is read by `notify.sh` and `marathon schedule`.
 
 ```markdown
 ---
@@ -210,14 +218,14 @@ Without StatusLine, quota is estimated from the JSONL transcript (less precise; 
 
 ## Scheduling
 
-`/marathon-schedule` generates platform-native configs for automated overnight runs. It auto-detects the platform (macOS launchd, Linux systemd, or cron fallback).
+`/marathon schedule` generates platform-native configs for automated overnight runs. It auto-detects the platform (macOS launchd, Linux systemd, or cron fallback).
 
 ```bash
 # Generate and install a schedule: start at 22:00, stop at 07:30, every day
-/marathon-schedule --start 22:00 --stop 07:30 --days daily
+/marathon schedule --start 22:00 --stop 07:30 --days daily
 
 # Uninstall
-/marathon-schedule --uninstall
+/marathon schedule --uninstall
 ```
 
 Settings are persisted to `.claude/marathon-config.local.md` so subsequent calls use saved defaults. Verify installation on macOS with `launchctl list | grep marathon`.
