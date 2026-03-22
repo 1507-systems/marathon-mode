@@ -190,3 +190,29 @@ Reviewed the first-ever marathon orchestrate run (~01:16-11:20 UTC, ~10 hours, 4
 3. Add blocker pre-filter to task scanning (P2)
 4. Fix quota visibility for subagent usage (P2)
 5. Add keychain pre-unlock at marathon start (P2)
+
+## 2026-03-22: Improvement Implementation Plan
+
+### Summary
+Wrote detailed implementation plan for all six priorities identified in the first-run retrospective. Plan covers files to create/modify, design details, complexity estimates, and dependency relationships.
+
+### What Was Done
+- Read and analyzed the full retrospective (`docs/first-run-retrospective.md`)
+- Read all plugin source files to understand current architecture (orchestrate skill, marathon command, quota-check.sh, statusline-quota.sh, quota-monitor hook, stop-hook, notify.sh)
+- Wrote `docs/plans/improvement-plan.md` covering:
+  - **P1 Agent Watchdog:** New `scripts/watchdog.sh` with agent registry, stall detection, model escalation on retry, stall log. Integration into orchestrate skill dispatch loop.
+  - **P2 Cross-Priority Dispatch:** Replace per-priority sequential loop with global dependency graph. Priority becomes tie-breaker, not gate. Eligibility-based flat dispatch loop.
+  - **P3 Quota Visibility:** Aggregate token usage from subagent JSONL files via agent registry. Enhance quota-check.sh with multi-session source. Add agent count to StatusLine display.
+  - **P4 Keychain Pre-unlock:** Attempt `security unlock-keychain` at marathon start. On failure, keyword-scan tasks for credential dependencies, auto-tag with `<!-- blocked: keychain -->`.
+  - **P5 Manual Task Pre-filter:** Keyword detection for hardware/GUI/Verve-dependent tasks. Auto-tag with `<!-- requires: hardware|gui|verve -->`. Orchestrator skips during dispatch.
+  - **P6 Docs Portal Approve Button:** Investigate and fix mobile approval flow in docs-viewer project.
+- Published plan to docs.1507.cloud for mobile review
+
+### Deliverables
+- `docs/plans/improvement-plan.md` -- full implementation plan with per-priority specifications
+
+### Next Steps
+1. Await plan approval via docs.1507.cloud
+2. Implement P1 (Watchdog) -- create `scripts/watchdog.sh`, update orchestrate skill and marathon command
+3. Implement P2 (Cross-Priority Dispatch) -- rewrite orchestrate skill Section 2 and Section 4
+4. Implement P3-P6 in order (or parallel where independent)
