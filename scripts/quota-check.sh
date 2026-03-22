@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # quota-check.sh — Read Claude quota data and output a JSON summary.
 #
-# Usage: quota-check.sh <SESSION_ID> <TRANSCRIPT_PATH>
+# Usage: quota-check.sh <SESSION_ID> <TRANSCRIPT_PATH> [--registry /path/to/registry.json]
 #
 # Primary path: reads /tmp/marathon-quota-<SESSION_ID>.json written by the
 #   StatusLine hook (expires after 5 minutes).
+# Multi-session path: if --registry is provided and file exists, aggregates token
+#   usage from all subagent JSONL files plus the parent transcript.
 # Fallback path: parses the JSONL transcript to estimate usage from token counts.
 #
 # Outputs a single JSON object to stdout.
@@ -16,12 +18,27 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: $(basename "$0") <SESSION_ID> <TRANSCRIPT_PATH>" >&2
+  echo "Usage: $(basename "$0") <SESSION_ID> <TRANSCRIPT_PATH> [--registry /path/to/registry.json]" >&2
   exit 1
 fi
 
 SESSION_ID="$1"
 TRANSCRIPT_PATH="$2"
+
+# Parse optional --registry argument
+REGISTRY_FILE=""
+shift 2
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --registry)
+      REGISTRY_FILE="${2:-}"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 # ---------------------------------------------------------------------------
 # Dependency check
@@ -171,6 +188,76 @@ if [[ -f "$QUOTA_CACHE" ]]; then
       exit 0
     fi
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# Multi-session aggregation path — agent registry
+# ---------------------------------------------------------------------------
+
+if [[ -n "$REGISTRY_FILE" && -f "$REGISTRY_FILE" ]]; then
+  # Collect all subagent JSONL paths from the registry
+  mapfile -t AGENT_JSONL_PATHS < <(jq -r '.agents[].jsonl_path // empty' "$REGISTRY_FILE" 2>/dev/null || true)
+
+  TOTAL_MULTI_TOKENS=0
+  AGENT_COUNT="${#AGENT_JSONL_PATHS[@]}"
+
+  # Sum tokens from each subagent JSONL file
+  for jsonl in "${AGENT_JSONL_PATHS[@]}"; do
+    if [[ -f "$jsonl" ]]; then
+      agent_tokens=$(
+        grep '"type":"assistant"' "$jsonl" 2>/dev/null \
+          | jq -r '.message.usage.output_tokens // 0' 2>/dev/null \
+          | awk '{sum+=$1} END {print (sum ? sum : 0)}'
+      )
+      TOTAL_MULTI_TOKENS=$(( TOTAL_MULTI_TOKENS + agent_tokens ))
+    fi
+  done
+
+  # Add the parent transcript tokens (counted once — not in registry)
+  if [[ -f "$TRANSCRIPT_PATH" ]]; then
+    parent_tokens=$(
+      grep '"type":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null \
+        | jq -r '.message.usage.output_tokens // 0' 2>/dev/null \
+        | awk '{sum+=$1} END {print (sum ? sum : 0)}'
+    )
+    TOTAL_MULTI_TOKENS=$(( TOTAL_MULTI_TOKENS + parent_tokens ))
+  fi
+
+  # Estimate five-hour percentage across all sessions (45,000,000 output tokens = 100%)
+  multi_estimated_pct=$(awk "BEGIN { printf \"%.4f\", ($TOTAL_MULTI_TOKENS / 45000000) * 100 }")
+
+  # Detect rate-limit signals across ALL transcripts
+  multi_rate_limited="false"
+  all_paths=("$TRANSCRIPT_PATH" "${AGENT_JSONL_PATHS[@]}")
+  for path in "${all_paths[@]}"; do
+    if [[ -f "$path" ]]; then
+      rl_count=$(grep -c '"rate_limit"\|"429"\|"Rate limit"' "$path" 2>/dev/null || true)
+      if [[ "$rl_count" -gt 0 ]]; then
+        multi_rate_limited="true"
+        break
+      fi
+    fi
+  done
+
+  multi_zone=$(calculate_zone "$multi_estimated_pct" "null" "null" "$multi_rate_limited")
+
+  jq -n \
+    --arg zone "$multi_zone" \
+    --argjson five_pct "$multi_estimated_pct" \
+    --argjson agent_count "$AGENT_COUNT" \
+    --argjson total_tokens "$TOTAL_MULTI_TOKENS" \
+    '{
+      zone: $zone,
+      five_hour_pct: $five_pct,
+      seven_day_pct: null,
+      resets_at: null,
+      resets_in_min: null,
+      is_using_overage: null,
+      agent_count: $agent_count,
+      total_tokens: $total_tokens,
+      source: "multi-session"
+    }'
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------

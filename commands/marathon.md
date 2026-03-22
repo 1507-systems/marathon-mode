@@ -46,11 +46,23 @@ You are starting a quota-aware autonomous work session.
 
 5. **Validate task file:** Parse it — count total tasks (lines matching `- [ ]`), verify format looks correct.
 
-6. **Check jq dependency:** Run `command -v jq`. If missing, warn: "jq is required for accurate quota monitoring. Install with `brew install jq` (macOS) or `apt install jq` (Linux)."
+6. **Keychain pre-unlock:** Attempt to unlock the login keychain:
+   ```bash
+   security unlock-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null
+   KEYCHAIN_UNLOCKED=$?
+   ```
+   If `KEYCHAIN_UNLOCKED != 0` (headless session, keychain locked):
+   - Log warning: "Keychain is locked (headless session). Credential-dependent tasks will be tagged as blocked."
+   - Scan the task file for tasks whose descriptions match credential-dependent keywords:
+     - "deploy", "Cloudflare", "CF", "Home Assistant", "HA", "Zoho", "API key", "API token", "secret", "credential", "wrangler", "publish", "authenticate"
+   - For each matching task that doesn't already have a `<!-- blocked: -->` annotation, append `<!-- blocked: keychain -->` on the line after the task.
+   - Report: "N tasks blocked (keychain locked)."
+
+7. **Check jq dependency:** Run `command -v jq`. If missing, warn: "jq is required for accurate quota monitoring. Install with `brew install jq` (macOS) or `apt install jq` (Linux)."
 
 ### Setup
 
-7. **Create state file** at `.claude/marathon.local.md`:
+8. **Create state file** at `.claude/marathon.local.md`:
 
 ```
 ---
@@ -66,12 +78,14 @@ last_check_pct: 0
 last_check_at: "{current UTC ISO timestamp}"
 resets_at: 0
 tasks_file: "{path to task file}"
+watchdog_pid: null
+keychain_unlocked: {true or false}
 ---
 ```
 
 Use `$CLAUDE_CODE_SESSION_ID` environment variable for session_id if available, otherwise generate one.
 
-8. **StatusLine check:** Check if the user has a statusLine configured in `~/.claude/settings.json`. If not, show:
+9. **StatusLine check:** Check if the user has a statusLine configured in `~/.claude/settings.json`. If not, show:
    > "For accurate quota monitoring, I recommend adding the marathon StatusLine. Add this to your `~/.claude/settings.json`:
    > ```json
    > {"statusLine": {"type": "command", "command": "{absolute path to scripts/statusline-quota.sh}"}}
@@ -80,10 +94,10 @@ Use `$CLAUDE_CODE_SESSION_ID` environment variable for session_id if available, 
 
    If they agree, update settings.json.
 
-9. **Send notification:**
-   ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/notify.sh" "Marathon Started" "{total_tasks} tasks, mode: {mode}" "$(pwd)"
-   ```
+10. **Send notification:**
+    ```bash
+    "${CLAUDE_PLUGIN_ROOT}/scripts/notify.sh" "Marathon Started" "{total_tasks} tasks, mode: {mode}" "$(pwd)"
+    ```
 
 ### Mode-Specific Behavior
 
@@ -178,6 +192,25 @@ Source: {scan|source file|interactive}
 - [ ] {task description}
 ```
 
+### Post-Generation: Manual Task Detection
+
+After building the task list (regardless of mode — scan, source, or interactive), run a keyword scan to detect tasks requiring manual/physical interaction:
+
+| Signal Keywords | Tag |
+|----------------|-----|
+| "dashboard", "console", "portal", "UI config", "GUI" | `<!-- requires: gui -->` |
+| "Xcode", "App Store Connect", "TestFlight", "Simulator" | `<!-- requires: verve -->` |
+| "UniFi", "router", "switch config", "VLAN" | `<!-- requires: gui -->` |
+| "hardware", "physical", "plug in", "cable", "install device", "swap", "flash" | `<!-- requires: hardware -->` |
+| "manually", "by hand", "sign in to", "log in to" | `<!-- requires: gui -->` |
+| "Verve", "desktop app" | `<!-- requires: verve -->` |
+| "screenshots", "screen recording" | `<!-- requires: gui -->` |
+
+For each matching `- [ ]` task:
+1. Append the appropriate `<!-- requires: ... -->` annotation on the line after the task.
+2. In interactive mode: highlight these tasks and ask "These tasks appear to require manual interaction. Include them for dispatch, or mark as manual-only?"
+3. In non-interactive mode (--scan, --source): auto-tag silently and note in the output: "N tasks tagged as manual-only (won't be dispatched by orchestrator)."
+
 ### After Generation
 
 Always present the generated list to the user:
@@ -204,9 +237,11 @@ Show the current marathon session state and quota information.
 
    If quota-check.sh fails or returns unknown, show "Quota: unknown (StatusLine not configured)" instead.
 
-4. **Read task file:** Count lines matching `- [x]` (completed), `- [ ]` (remaining), and any marked `[FAILED]` or `[WIP]`.
+4. **Read task file:** Count lines matching `- [x]` (completed), `- [ ]` (remaining), and any marked `[FAILED]`, `[WIP]`, `<!-- requires: -->` (manual), or `<!-- blocked: keychain -->` (keychain-blocked).
 
 5. **Get current task description:** Find the {current_task}th unchecked `- [ ]` line and extract its description.
+
+5a. **Get agent info:** If `/tmp/marathon-agents-{session_id}.json` exists, count active agents and check for stall log entries at `/tmp/marathon-stall-log-{session_id}.jsonl`.
 
 6. **Calculate durations:**
    - Session duration from started_at to now
@@ -223,8 +258,10 @@ Zone:     {ZONE} ({pct}% used)
 Resets:   {time} ({source})
 Wake:     {time or "not set"} ({duration remaining})
 Duration: {session duration}
+Agents:   {n} active | {n} stalls detected
+Keychain: {unlocked or locked}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Completed: {n} | Remaining: {n} | Failed: {n} | WIP: {n}
+Completed: {n} | Remaining: {n} | Failed: {n} | WIP: {n} | Manual: {n} | Keychain: {n}
 ```
 
 ---
@@ -255,19 +292,29 @@ Execute the marathon wind-down sequence. This is the same sequence triggered aut
    "${CLAUDE_PLUGIN_ROOT}/scripts/notify.sh" "Marathon Stopped" "{completed}/{total} tasks done, {remaining} remaining" "$(pwd)"
    ```
 
-7. **Clean up:**
+7. **Kill watchdog:** If `watchdog_pid` is set in the state file and not null, send SIGTERM:
+   ```bash
+   kill "$WATCHDOG_PID" 2>/dev/null || true
+   ```
+
+8. **Clean up:**
    - Remove `.claude/marathon.local.md`
    - Remove `/tmp/marathon-quota-{session_id}.json` if it exists
+   - Remove `/tmp/marathon-agents-{session_id}.json` if it exists
+   - Remove `/tmp/marathon-stall-log-{session_id}.jsonl` if it exists
 
-8. **Display summary:**
+9. **Display summary:**
 ```
 Marathon Stopped
 ━━━━━━━━━━━━━━━
-Completed: {n}/{total}
-Failed:    {n}
-WIP:       {n}
-Remaining: {n}
-Duration:  {time}
+Completed:        {n}/{total}
+Failed:           {n}
+Stalled+Retried:  {n} (from stall log)
+WIP:              {n}
+Skipped (manual): {n}
+Skipped (keychain): {n}
+Remaining:        {n}
+Duration:         {time}
 ━━━━━━━━━━━━━━━
 Task file preserved at {path} — run /marathon to resume.
 ```

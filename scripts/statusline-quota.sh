@@ -162,12 +162,45 @@ if [[ -f "$MARATHON_FILE" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Check for agent registry — aggregate token usage across subagent sessions
+# ---------------------------------------------------------------------------
+AGENT_DISPLAY=""
+REGISTRY_FILE="/tmp/marathon-agents-${SESSION_ID}.json"
+if [[ -n "$SESSION_ID" && -f "$REGISTRY_FILE" ]]; then
+  # Count active agents (entries in agents array)
+  AGENT_COUNT=$(jq '.agents | length' "$REGISTRY_FILE" 2>/dev/null || echo "0")
+  if [[ "$AGENT_COUNT" -gt 0 ]]; then
+    # Sum tokens across all agent JSONL files
+    TOTAL_TOKENS=0
+    for jsonl in $(jq -r '.agents[].jsonl_path // empty' "$REGISTRY_FILE" 2>/dev/null); do
+      if [[ -f "$jsonl" ]]; then
+        TOKENS=$(grep '"type":"assistant"' "$jsonl" 2>/dev/null | jq -r '.message.usage.output_tokens // 0' 2>/dev/null | awk '{sum+=$1} END {print (sum ? sum : 0)}')
+        TOTAL_TOKENS=$(( TOTAL_TOKENS + TOKENS ))
+      fi
+    done
+    # Format token count (e.g., 2.1M, 450K)
+    if [[ $TOTAL_TOKENS -ge 1000000 ]]; then
+      TOKEN_DISPLAY=$(awk "BEGIN { printf \"%.1fM\", $TOTAL_TOKENS / 1000000 }")
+    elif [[ $TOTAL_TOKENS -ge 1000 ]]; then
+      TOKEN_DISPLAY=$(awk "BEGIN { printf \"%.0fK\", $TOTAL_TOKENS / 1000 }")
+    else
+      TOKEN_DISPLAY="${TOTAL_TOKENS}"
+    fi
+    AGENT_DISPLAY="agents: ${AGENT_COUNT} (~${TOKEN_DISPLAY} tok)"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Build and emit the final display string
 # ---------------------------------------------------------------------------
 BASE="5h: ${FIVE_PCT_DISPLAY}% | 7d: ${SEVEN_PCT_DISPLAY}% | resets: ${RESETS_DISPLAY} | ZONE: ${ZONE}"
 
-if [[ -n "$MARATHON_DISPLAY" ]]; then
+if [[ -n "$MARATHON_DISPLAY" && -n "$AGENT_DISPLAY" ]]; then
+  echo "${BASE} | ${MARATHON_DISPLAY} | ${AGENT_DISPLAY}"
+elif [[ -n "$MARATHON_DISPLAY" ]]; then
   echo "${BASE} | ${MARATHON_DISPLAY}"
+elif [[ -n "$AGENT_DISPLAY" ]]; then
+  echo "${BASE} | ${AGENT_DISPLAY}"
 else
   echo "${BASE}"
 fi

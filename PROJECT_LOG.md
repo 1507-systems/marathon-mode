@@ -212,7 +212,60 @@ Wrote detailed implementation plan for all six priorities identified in the firs
 - `docs/plans/improvement-plan.md` -- full implementation plan with per-priority specifications
 
 ### Next Steps
-1. Await plan approval via docs.1507.cloud
-2. Implement P1 (Watchdog) -- create `scripts/watchdog.sh`, update orchestrate skill and marathon command
-3. Implement P2 (Cross-Priority Dispatch) -- rewrite orchestrate skill Section 2 and Section 4
-4. Implement P3-P6 in order (or parallel where independent)
+1. ~~Await plan approval via docs.1507.cloud~~ Approved
+2. ~~Implement P1 (Watchdog)~~ Done
+3. ~~Implement P2 (Cross-Priority Dispatch)~~ Done
+4. ~~Implement P3-P6~~ P3-P5 done, P6 done in previous session
+
+## 2026-03-22: Improvement Plan Implementation (P1-P5)
+
+### Summary
+Implemented all six priorities from the improvement plan. P6 (docs portal mobile approve fix) was completed in the previous session. P1-P5 implemented in this session.
+
+### What Was Done
+
+**P1 — Agent Watchdog:**
+- Created `scripts/watchdog.sh` (~330 lines): background stall detector with SIGTERM/SIGKILL, task file FAILED marking, stall log, notification dispatch, retry queue with model escalation (haiku->sonnet->opus)
+- Agent registry protocol at `/tmp/marathon-agents-{session_id}.json`
+- Stall log at `/tmp/marathon-stall-log-{session_id}.jsonl`
+- Integrated into orchestrate skill (Section 4: Agent Registry, Section 5: launch/cleanup, Section 7: stall error handling)
+- Integrated into marathon command (watchdog_pid in state file, kill on stop, temp file cleanup)
+
+**P2 — Cross-Priority Dispatch:**
+- Rewrote orchestrate skill Section 2: global dependency graph replaces per-priority sequential tiers
+- Rewrote Section 5 (was Section 4): flat eligibility-based dispatch loop. Priority is tie-breaker, not gate.
+- P4 tasks with no dependencies now dispatch alongside P1 tasks in GREEN zone
+- Stalled/failed tasks only block explicit dependents, not entire priority levels
+
+**P3 — Quota Visibility:**
+- Added `--registry` argument to `quota-check.sh` for multi-session token aggregation
+- New data source path: iterates all subagent JSONL files from registry, sums output_tokens
+- Added `agent_count` and `total_tokens` fields to JSON output (source: "multi-session")
+- Updated `statusline-quota.sh` to read agent registry and append `agents: N (~X tok)` to display
+
+**P4 — Keychain Pre-unlock:**
+- Added step 6 to marathon start pre-flight: `security unlock-keychain` attempt
+- On failure: keyword scan for credential-dependent tasks, auto-tag with `<!-- blocked: keychain -->`
+- Added `keychain_unlocked` field to state file schema
+- Orchestrator skips `<!-- blocked: keychain -->` tasks during dispatch
+
+**P5 — Manual Task Pre-filter:**
+- Added post-generation keyword detection to `/marathon tasks` (all modes: scan, source, interactive)
+- Keyword table: dashboard/console/GUI -> `requires: gui`, Xcode/TestFlight -> `requires: verve`, hardware/physical -> `requires: hardware`
+- Orchestrator skips `<!-- requires: ... -->` tasks during dispatch
+- Wind-down summary includes "Skipped (manual)" and "Skipped (keychain)" counts
+
+### Architecture Decisions
+- Watchdog uses Python for task file editing (macOS sed -i requires backup suffix, Python is more reliable for in-place edits)
+- Agent registry is shared state in /tmp — both watchdog and quota scripts read it
+- Global dependency graph uses priority as sort key, not execution gate — simplifies the dispatch loop
+- Keychain check is best-effort: if unlock fails, tasks are tagged but marathon still runs
+
+### Shellcheck Status
+All scripts clean: watchdog.sh, quota-check.sh, statusline-quota.sh
+
+### Next Steps
+1. End-to-end test: run `/marathon --orchestrate` with new features active
+2. Verify watchdog detects stalls in a controlled test (launch agent, let it idle)
+3. Verify multi-session quota aggregation shows correct token counts in StatusLine
+4. Consider adding dry-run mode and post-run summary report (from retrospective backlog)
