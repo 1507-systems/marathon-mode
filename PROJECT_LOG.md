@@ -164,3 +164,29 @@ All 6 scripts clean after fixes.
 - Security audit clean
 - Documentation complete and accurate
 - Tagged: v1.0-audit-clean
+
+## 2026-03-22: First Run Retrospective
+
+### Summary
+Reviewed the first-ever marathon orchestrate run (~01:16-11:20 UTC, ~10 hours, 48 tasks across ~35 projects). Documented findings in `docs/first-run-retrospective.md`.
+
+### Key Findings
+- **Successes:** 14+ parallel agents, zero git conflicts, discipline rules held, notification pipeline reliable, task file as shared state worked well
+- **Critical gap:** No watchdog for stalled agents -- 3 Haiku agents hung for 5+ hours undetected
+- **Design flaw:** Strict priority-level sequencing blocked P3/P4 tasks behind stalled P2 tasks
+- **Quota blindness:** Parent session cannot see subagent token usage, so quota monitoring never engaged
+- **Wasted dispatch:** ~25% of tasks were manual-only (CF dashboard, Xcode, UniFi console) and could have been pre-filtered
+
+### Deliverables
+- `docs/first-run-retrospective.md` -- full retrospective with statistics, root cause analysis, proposed fixes
+- Detailed WATCHDOG mechanism design (agent registry, stall detection, model escalation on retry, stall log)
+- Cross-priority dispatch proposal (replace strict priority ordering with global dependency graph)
+- Blocker pre-filter proposal for `/marathon tasks` scanning
+- Priority matrix for all proposed fixes (P1-P4)
+
+### Next Steps
+1. Implement watchdog mechanism (P1)
+2. Implement cross-priority dispatch (P1)
+3. Add blocker pre-filter to task scanning (P2)
+4. Fix quota visibility for subagent usage (P2)
+5. Add keychain pre-unlock at marathon start (P2)
