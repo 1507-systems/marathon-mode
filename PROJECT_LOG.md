@@ -269,3 +269,75 @@ All scripts clean: watchdog.sh, quota-check.sh, statusline-quota.sh
 2. Verify watchdog detects stalls in a controlled test (launch agent, let it idle)
 3. Verify multi-session quota aggregation shows correct token counts in StatusLine
 4. Consider adding dry-run mode and post-run summary report (from retrospective backlog)
+
+## 2026-03-22: End-to-End Feature Test (P1-P5)
+
+### Summary
+Marathon task 5/30: Tested all five P1-P5 improvements end-to-end. One bug found in quota-check.sh (no file changes — test-only task).
+
+### Test Results
+
+**P1 — Watchdog (watchdog.sh):**
+- Arg parsing verified: SESSION_ID positional, --stall-timeout/--max-retries/--check-interval all parsed correctly
+- shellcheck: CLEAN (exit 0)
+- Live test with mock registry (/tmp/marathon-agents-testrun.json) and 2-minute-old JSONL:
+  - Stall detected at 1-minute threshold after 1-second check-interval — PASS
+  - pid=999999 (nonexistent) handled gracefully: "pid is already gone" — PASS
+  - Stall log written to /tmp/marathon-stall-log-testrun.jsonl with correct JSON — PASS
+  - Retry queued (retry 1/1) with model escalation haiku->sonnet — PASS
+  - SIGTERM handled cleanly ("Watchdog exiting cleanly") — PASS
+  - tasks_file resolution: correctly warns when /tmp has no .claude/marathon.local.md — PASS
+- All test files cleaned up
+
+**P2 — Cross-Priority Dispatch (orchestrate SKILL.md):**
+- Section 2 verified: "Build a single global dependency graph across ALL priority levels" — PASS
+- Section 5 dispatch loop verified: flat eligibility-based loop (steps a-i), not nested per-priority — PASS
+- Priority described as tie-breaker: "Priority ASC (P1 tasks dispatch before P4 tasks when competing for slots)" — PASS
+- Explicit confirmation in Section 5 notes: "Priority is a tie-breaker, NOT a gate. P4 tasks with no dependencies run alongside P1 tasks." — PASS
+
+**P3 — Quota Visibility (quota-check.sh + statusline-quota.sh):**
+- --registry flag: parsed and applied correctly in quota-check.sh
+- BUG FOUND: `mapfile` (bash 4+) not available on macOS system bash (3.2.57). The --registry path fails with "mapfile: command not found" on this system. Fallback paths work correctly:
+  - No cache + no transcript: returns zone=unknown, source=none — PASS
+  - StatusLine cache present: returns correct zone/pct data, source=statusline — PASS
+  - JSONL transcript with assistant messages: returns estimated pct, source=jsonl — PASS
+- SECONDARY BUG: grep in JSONL fallback path exits 1 when no assistant messages match. Under set -euo pipefail, this kills the subshell in command substitution. Script exits 1 when transcript exists but has no "type":"assistant" lines. Workaround: transcript must have at least one assistant message for the fallback path to succeed.
+- statusline-quota.sh: all paths tested — PASS
+  - No rate_limits: empty output, exit 0 — PASS
+  - With rate_limits: correct display format ("5h: 55% | 7d: 30% | resets: 59m | ZONE: GREEN") — PASS
+  - Snapshot file written to /tmp/marathon-quota-{session_id}.json — PASS
+  - Agent registry detection: reads /tmp/marathon-agents-{session_id}.json when present — PASS
+
+**P4 — Keychain Pre-unlock (marathon.md step 6):**
+- Verified step 6 present: `security unlock-keychain ~/Library/Keychains/login.keychain-db 2>/dev/null` — PASS
+- Keyword scan described: "deploy", "Cloudflare", "CF", "Home Assistant", "HA", "Zoho", "API key", "API token", "secret", "credential", "wrangler", "publish", "authenticate" — PASS
+- On failure: append `<!-- blocked: keychain -->` annotation, report "N tasks blocked (keychain locked)" — PASS
+
+**P5 — Manual Pre-filter (marathon.md post-generation section):**
+- Keyword detection table present and complete — PASS
+- gui: dashboard, console, portal, UI config, GUI, UniFi, router, switch config, VLAN, manually, by hand, sign in to, log in to, screenshots, screen recording — PASS
+- verve: Xcode, App Store Connect, TestFlight, Simulator, Verve, desktop app — PASS
+- hardware: hardware, physical, plug in, cable, install device, swap, flash — PASS
+- Requires tags `<!-- requires: gui|verve|hardware -->` — PASS
+
+**shellcheck (all scripts):**
+- watchdog.sh: CLEAN
+- quota-check.sh: CLEAN
+- statusline-quota.sh: CLEAN
+- notify.sh: CLEAN
+- generate-schedule.sh: CLEAN
+- All 5 scripts: shellcheck exit 0, zero warnings
+
+### Bugs Found (not fixed — test-only task)
+
+**Bug 1: `mapfile` not available on macOS system bash 3.2** (quota-check.sh line 199)
+- Symptom: `bash: mapfile: command not found` when --registry path is taken
+- Root cause: `mapfile` is a bash 4.0+ builtin. macOS ships bash 3.2.57 as /bin/bash. The script shebang uses `#!/usr/bin/env bash` which resolves to bash 3.2 on this machine (no brew bash installed).
+- Impact: Multi-session aggregation (--registry path) is broken on macOS without brew bash
+- Fix needed: Replace `mapfile -t arr < <(cmd)` with a while-read loop compatible with bash 3.2: `while IFS= read -r line; do arr+=("$line"); done < <(cmd)`
+
+**Bug 2: `grep` exit 1 on no match propagates through `$(...)` under `pipefail`** (quota-check.sh ~line 273)
+- Symptom: Script exits 1 when JSONL transcript exists but contains no `"type":"assistant"` lines
+- Root cause: `set -euo pipefail` applies inside command substitution subshells. `grep "pattern" file | jq ... | awk ...` — if grep finds no match (exit 1), pipefail treats the pipeline as failed, the `$(...)` propagates exit 1, and `set -e` kills the script.
+- Impact: `emit_unknown` is not reached; script exits 1 instead of returning zone=unknown
+- Fix needed: Protect the grep with `|| true` at the pipeline level, not just on the outer command. Change: `grep "..." file 2>/dev/null | jq ... | awk ...` to `{ grep "..." file 2>/dev/null || true; } | jq ... | awk ...`
