@@ -10,6 +10,9 @@ Quota-aware autonomous work sessions for Claude Code.
 - **Per-task model right-sizing** — auto-detects task complexity (Haiku / Sonnet / Opus) from description keywords, with explicit `<!-- model: -->` overrides and automatic quota-based downshift
 - **Parallel dispatch with quota-throttled concurrency** — GREEN runs all independent tasks simultaneously; YELLOW caps at 2; ORANGE/RED triggers wind-down
 - **Graceful wind-down with clean breakpoints** — waits for in-flight tasks to finish, commits WIP, updates PROJECT_LOGs, pushes, and writes a `<!-- resume_after: -->` marker for automatic resume after quota reset
+- **Agent watchdog** — background stall detector monitors subagent activity; kills hung agents, logs stalls, retries with model escalation (haiku -> sonnet -> opus)
+- **Post-run summary report** — writes a detailed markdown report (`marathon-report-{session_id}.md`) with task results, quota usage, stall log, and skipped tasks
+- **Dry-run mode** — `--dry-run` previews the dispatch plan (models, tiers, blocked tasks) without running anything
 - **Two modes** — Advisory (monitoring only, you drive) or Orchestrate (full autonomous dispatch via the Stop hook task-cycling loop)
 
 ---
@@ -69,6 +72,7 @@ Everything is a single `/marathon` command with subcommands and flags:
 |---|---|
 | `/marathon` | Start advisory session (quota monitoring, you drive) |
 | `/marathon --orchestrate` | Start orchestrate session (autonomous dispatch) |
+| `/marathon --orchestrate --dry-run` | Show dispatch plan without running (models, tiers, blocked tasks) |
 | `/marathon --orchestrate --wake-time HH:MM` | Overnight autonomous run with wind-down time |
 | `/marathon --file path` | Start with a specific task file |
 | `/marathon tasks` | Build task list interactively |
@@ -159,6 +163,15 @@ Source: scan
 
 **Parallelism hint:** `<!-- independent -->` marks a same-project task safe to run in parallel with others.
 
+**Manual/blocked annotations** (auto-detected by `/marathon tasks` and keychain pre-unlock):
+
+| Annotation | Meaning |
+|---|---|
+| `<!-- requires: gui -->` | Task needs a GUI (dashboard, console, portal). Skipped by orchestrator. |
+| `<!-- requires: verve -->` | Task needs Xcode / App Store Connect / a specific desktop. Skipped by orchestrator. |
+| `<!-- requires: hardware -->` | Task needs physical access (cable, device swap). Skipped by orchestrator. |
+| `<!-- blocked: keychain -->` | Task needs credentials but keychain is locked (headless session). Skipped by orchestrator. |
+
 ---
 
 ## Configuration
@@ -229,6 +242,32 @@ Without StatusLine, quota is estimated from the JSONL transcript (less precise; 
 ```
 
 Settings are persisted to `.claude/marathon-config.local.md` so subsequent calls use saved defaults. Verify installation on macOS with `launchctl list | grep marathon`.
+
+---
+
+## Agent Watchdog
+
+In orchestrate mode, a background watchdog process (`scripts/watchdog.sh`) monitors all active subagents for stalls. If an agent's JSONL output has not been updated within the stall timeout (default: 15 minutes), the watchdog:
+
+1. Kills the stalled agent (SIGTERM, then SIGKILL after 5s)
+2. Marks the task as `[FAILED]` in the task file
+3. Writes an entry to the stall log (`/tmp/marathon-stall-log-{session_id}.jsonl`)
+4. Sends a notification
+5. Queues a retry with model escalation (haiku -> sonnet -> opus) if retries remain
+
+The agent registry (`/tmp/marathon-agents-{session_id}.json`) tracks all active subagents and pending retries. Both the watchdog and quota aggregation scripts read this file.
+
+---
+
+## Post-Run Summary Report
+
+At the end of every orchestrate session, a summary report is written to `.claude/marathon-report-{session_id}.md`. It includes:
+
+- Session metadata (start/end time, duration, mode, wake time)
+- Task results table (description, status, model, project)
+- Quota usage at wind-down
+- Stall log summary (if any stalls were detected)
+- Skipped tasks with reasons (manual, keychain, dependencies)
 
 ---
 

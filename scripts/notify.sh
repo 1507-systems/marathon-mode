@@ -76,8 +76,11 @@ case "$NOTIFICATION_TYPE" in
 
   osascript)
     # macOS native notification via osascript
+    # Escape double quotes and backslashes to prevent AppleScript injection
     if command -v osascript &>/dev/null; then
-      osascript -e "display notification \"${MESSAGE}\" with title \"${TITLE}\"" || true
+      SAFE_MSG="$(echo "$MESSAGE" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+      SAFE_TITLE="$(echo "$TITLE" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+      osascript -e "display notification \"${SAFE_MSG}\" with title \"${SAFE_TITLE}\"" || true
     fi
     ;;
 

@@ -1,9 +1,11 @@
 # Marathon Mode — Design Specification
 
-**Date:** 2026-03-20
-**Status:** Draft
+**Date:** 2026-03-20 (updated 2026-03-22)
+**Status:** Implemented (v1.1.0)
 **License:** MIT
 **Repo:** `1507-systems/marathon-mode` (public)
+
+> **Post-v1.0 additions (not in original spec):** Agent watchdog with stall detection and model escalation (`scripts/watchdog.sh`), cross-priority global dependency graph dispatch, multi-session quota aggregation (`--registry`), keychain pre-unlock with `<!-- blocked: keychain -->` tagging, manual task pre-filter with `<!-- requires: gui|verve|hardware -->` tagging, `--dry-run` mode, post-run summary report. See `docs/plans/improvement-plan.md` for full design details.
 
 ## Overview
 
@@ -34,32 +36,36 @@ Marathon Mode solves all of these by making quota a first-class concern in auton
 ```
 marathon-mode/
 ├── .claude-plugin/
-│   └── plugin.json              # Plugin manifest
+│   ├── plugin.json              # Plugin manifest
+│   └── marketplace.json         # Marketplace metadata
 ├── commands/
-│   ├── marathon.md              # Start a marathon session
-│   ├── marathon-status.md       # Check current state + quota
-│   ├── marathon-stop.md         # Graceful wind-down
-│   ├── marathon-schedule.md     # Generate/install scheduler configs
-│   └── marathon-tasks.md        # Build a task list from project state
+│   └── marathon.md              # Unified /marathon command (start, tasks, status, stop, schedule)
 ├── hooks/
 │   ├── hooks.json               # Hook registration (PostToolUse, Stop)
-│   ├── quota-monitor.sh         # PostToolUse hook — quota tracking
+│   ├── quota-monitor.sh         # PostToolUse hook — quota tracking + zone transitions
 │   └── stop-hook.sh             # Stop hook — task cycling in orchestrate mode
 ├── skills/
 │   └── orchestrate/
-│       └── SKILL.md             # Orchestration skill — task dispatch + model selection
+│       └── SKILL.md             # Orchestration skill — dependency graph, dispatch, watchdog, wind-down
 ├── scripts/
-│   ├── quota-check.sh           # Read quota state, output JSON summary
-│   ├── statusline-quota.sh      # StatusLine integration (display-only, optional)
+│   ├── quota-check.sh           # Read quota state, output JSON summary (--registry for multi-session)
+│   ├── statusline-quota.sh      # StatusLine integration (display + /tmp snapshot)
 │   ├── generate-schedule.sh     # Generate launchd/cron/systemd configs
-│   └── notify.sh                # Notification dispatcher
+│   ├── notify.sh                # Notification dispatcher (ntfy, webhook, osascript)
+│   └── watchdog.sh              # Background agent stall detector (kill, retry, escalate)
 ├── templates/
 │   ├── launchd.plist.template   # macOS launchd template
 │   ├── cron.template            # Cron entry template
 │   └── systemd.template         # Linux systemd timer/service template
+├── docs/
+│   ├── first-run-retrospective.md
+│   └── plans/
+│       └── improvement-plan.md
 ├── LICENSE                      # MIT
 └── README.md
 ```
+
+> **Note:** The original design spec described five separate commands (`marathon.md`, `marathon-status.md`, `marathon-stop.md`, `marathon-schedule.md`, `marathon-tasks.md`). During implementation these were consolidated into a single `marathon.md` command with subcommands: `/marathon`, `/marathon tasks`, `/marathon status`, `/marathon stop`, `/marathon schedule`.
 
 ### Plugin Manifest: `.claude-plugin/plugin.json`
 

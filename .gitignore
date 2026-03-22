@@ -2,6 +2,10 @@
 .claude/marathon.local.md
 .claude/marathon-config.local.md
 .claude/marathon-tasks.md
+.claude/marathon-report-*.md
+
+# Wrangler cache (not used, but may appear from accidental wrangler runs)
+.wrangler/
 
 # OS files
 .DS_Store

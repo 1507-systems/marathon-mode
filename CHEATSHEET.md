@@ -8,6 +8,7 @@ Everything is a single `/marathon` command with subcommands:
 /marathon                           # Start advisory session
 /marathon --orchestrate             # Start orchestrate (autonomous) session
 /marathon --orchestrate --wake-time 07:30   # Overnight autonomous run
+/marathon --orchestrate --dry-run   # Preview dispatch plan without running
 /marathon --file ./my-tasks.md      # Use a specific task file
 
 /marathon tasks                     # Build task list interactively
@@ -44,6 +45,8 @@ Everything is a single `/marathon` command with subcommands:
 
 **Model hints:** `<!-- model: haiku|sonnet|opus -->` — right-sizes per task
 **Dependencies:** `<!-- after: task description -->` — sequential ordering
+**Manual tasks:** `<!-- requires: gui|verve|hardware -->` — skipped by orchestrator
+**Keychain blocked:** `<!-- blocked: keychain -->` — skipped when keychain locked
 
 ## Status Display
 
@@ -62,12 +65,13 @@ Completed: 2 | Remaining: 10 | Failed: 0 | WIP: 0
 
 ## Quota Zones
 
-| Zone | Usage | Behavior |
-|------|-------|----------|
-| GREEN | 0–60% | Full speed, all models available |
-| YELLOW | 60–80% | Downshift models (opus→sonnet, sonnet→haiku) |
-| ORANGE | 80–95% | Wind-down: finish current task, commit, stop |
-| RED | 95%+ | Emergency stop, commit WIP immediately |
+| Zone | 5-Hour Usage | Behavior |
+|------|--------------|----------|
+| GREEN | < 70% | Full speed, all models available, unlimited parallel |
+| YELLOW | 70–84% | Max 2 parallel, opus -> sonnet downshift |
+| ORANGE | 85–94% | Wind-down: finish current task, commit, stop. All models downshift one tier. |
+| RED | >= 95% | Emergency save. Commit WIP, push, halt. Everything on Haiku. |
+| COAST | >= 95% + reset <= 45 min | Save state with resume marker, exit. Scheduler restarts after reset. |
 
 ## Typical Workflows
 
@@ -100,3 +104,7 @@ Completed: 2 | Remaining: 10 | Failed: 0 | WIP: 0
 | `.claude/marathon-tasks.md` | Task list (checklist format) |
 | `.claude/marathon.local.md` | Active session state (auto-managed) |
 | `.claude/marathon-config.local.md` | Saved schedule/notification settings |
+| `.claude/marathon-report-{id}.md` | Post-run summary report |
+| `/tmp/marathon-agents-{id}.json` | Agent registry (active subagents) |
+| `/tmp/marathon-stall-log-{id}.jsonl` | Stall detection log |
+| `/tmp/marathon-quota-{id}.json` | Quota snapshot (StatusLine) |
