@@ -143,8 +143,8 @@ UNCHECKED_COUNT=$(grep -c "^- \[ \]" "$TASKS_FILE" 2>/dev/null || true)
 # ---------------------------------------------------------------------------
 
 if [[ "$UNCHECKED_COUNT" -eq 0 ]]; then
-  # Remove the state file so future stops are clean
-  rm -f "$STATE_FILE"
+  # Move the state file to Trash — do not use rm per project file ops policy
+  mv "$STATE_FILE" ~/.Trash/ 2>/dev/null || true
 
   # Send a completion notification
   NOTIFY_SCRIPT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$0")")}/scripts/notify.sh"

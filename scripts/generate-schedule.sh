@@ -109,6 +109,10 @@ START_MINUTE="${START_MINUTE#0}"
 START_HOUR="${START_HOUR:-0}"
 START_MINUTE="${START_MINUTE:-0}"
 
+# Zero-padded variants for formats that require them (e.g. systemd OnCalendar)
+START_HOUR_PAD=$(printf "%02d" "$START_HOUR")
+START_MINUTE_PAD=$(printf "%02d" "$START_MINUTE")
+
 WAKE_TIME="$STOP_TIME"
 
 # ── sed substitution helper ───────────────────────────────────────────────────
@@ -116,6 +120,8 @@ WAKE_TIME="$STOP_TIME"
 # Reads from stdin, writes substituted content to stdout.
 apply_substitutions() {
     sed \
+        -e "s|__START_HOUR_PAD__|${START_HOUR_PAD}|g" \
+        -e "s|__START_MINUTE_PAD__|${START_MINUTE_PAD}|g" \
         -e "s|__START_HOUR__|${START_HOUR}|g" \
         -e "s|__START_MINUTE__|${START_MINUTE}|g" \
         -e "s|__WAKE_TIME__|${WAKE_TIME}|g" \

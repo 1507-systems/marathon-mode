@@ -2,7 +2,7 @@
 Description=Marathon Mode Nightly Run
 
 [Timer]
-OnCalendar=*-*-* __START_HOUR__:__START_MINUTE__:00
+OnCalendar=*-*-* __START_HOUR_PAD__:__START_MINUTE_PAD__:00
 Persistent=true
 
 [Install]

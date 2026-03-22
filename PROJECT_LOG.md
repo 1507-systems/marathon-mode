@@ -47,6 +47,94 @@ Built the complete marathon-mode Claude Code plugin from design spec through imp
 3. Configure StatusLine and verify live quota display
 4. Set up launchd schedule for nightly runs
 
+## 2026-03-22: End-to-End Testing + Bug Fixes
+
+### What Was Done
+
+Full end-to-end script test covering all scripts and hooks with real inputs. Two bugs found and fixed.
+
+### Scripts Tested
+
+**scripts/statusline-quota.sh:**
+- No rate_limits: exits silently, outputs empty string — correct
+- GREEN/YELLOW/ORANGE/RED zones: all thresholds correct at boundaries
+- /tmp snapshot written with correct JSON structure and timestamps
+- Marathon state file integration: `task 3/8` suffix appended when state exists
+- Past resets_at (0): shows "now" — correct
+- All outputs match documented format: `5h: 42% | 7d: 18% | resets: 8h0m | ZONE: GREEN | task 3/8`
+
+**scripts/notify.sh:**
+- Missing config file: silent exit 0 — correct
+- notification_type=none: silent exit 0 — correct
+- notification_type=osascript: macOS notification fires — correct
+- notification_type=webhook with unreachable URL: silent exit 0 (|| true) — correct
+- notification_type=ntfy with unreachable URL: silent exit 0 (|| true) — correct
+
+**scripts/quota-check.sh:**
+- Fresh StatusLine cache: returns correct JSON with source=statusline
+- COAST zone detection (>95%, reset <45 min): returns zone=coast — correct
+- Stale cache (>5 min): falls through to JSONL fallback — correct
+- JSONL fallback with mock transcript: estimates pct from output_tokens — correct
+- JSONL fallback with rate_limit signal: returns zone=red — correct
+- Missing args: exits 1 with usage message — correct
+
+**scripts/generate-schedule.sh:**
+- macOS launchd plist: correct tokens, integer hour/minute, unpadded — correct
+- cron output: correct minute/hour field order, --days flag works — correct
+- linux systemd: BUG FOUND (see below)
+- Error handling: --platform missing, unknown platform — both error correctly
+- --days weekdays (1-5): correct cron output
+
+**hooks/quota-monitor.sh:**
+- No marathon state file: silent exit 0 — correct
+- Zone change (green → yellow): emits systemMessage with pct and resets_in — correct
+- No zone change: produces no output, fast path — correct
+
+**hooks/stop-hook.sh:**
+- No state file: silent exit 0 — correct
+- Orchestrate mode with pending tasks: blocks stop, emits next task prompt with discipline rules — correct
+- Advisory mode: allows exit regardless of tasks — correct
+- RED zone: allows exit despite orchestrate mode — correct
+- All tasks complete: cleans up state file, allows exit — correct
+- Wake time < 30 min: allows exit — correct
+- Model hint detection: `<!-- model: haiku -->` included in reason prompt — correct
+
+### Bugs Found and Fixed
+
+**Bug 1: systemd OnCalendar missing zero-padding** (generate-schedule.sh + systemd.template)
+- Symptom: `OnCalendar=*-*-* 8:5:00` instead of `08:05:00`
+- Root cause: `generate-schedule.sh` strips leading zeros from hour/minute for launchd plist
+  integer fields (correct for XML), but the systemd template uses the same unpadded tokens.
+  systemd's `OnCalendar` format requires HH:MM zero-padded.
+- Fix: Added `START_HOUR_PAD` and `START_MINUTE_PAD` variables (via `printf "%02d"`), added
+  substitution rules `__START_HOUR_PAD__` / `__START_MINUTE_PAD__` in `apply_substitutions()`,
+  and updated `systemd.template` to use the padded tokens.
+- Verified: `22:00:00`, `08:05:00`, `09:30:00` all correct after fix.
+
+**Bug 2: rm -f in stop-hook.sh** (hooks/stop-hook.sh line 147)
+- Symptom: state file deleted with `rm -f` on marathon completion
+- Root cause: violates project file ops policy (never use rm; always move to Trash)
+- Fix: Replaced `rm -f "$STATE_FILE"` with `mv "$STATE_FILE" ~/.Trash/ 2>/dev/null || true`
+  The `|| true` ensures a non-fatal failure if Trash is unavailable (e.g. Linux without .Trash).
+- Verified: state file moves to ~/.Trash/ on completion.
+
+### Recommendations
+
+1. **Linux Trash compatibility**: The Trash fix (`mv to ~/.Trash/`) works on macOS but Linux
+   uses `~/.local/share/Trash/files/`. For full Linux compatibility, consider a helper that
+   uses `gio trash` (if available) or falls back to a temp dir. Low priority since marathon
+   is primarily macOS-targeted.
+
+2. **StatusLine display "8h0m" formatting**: When resets_at is exactly on the hour boundary,
+   the display shows `8h0m` rather than `8h`. Minor cosmetic issue — not a bug.
+
+3. **JSONL fallback estimation accuracy**: The 45,000,000 output-token estimate for 100% usage
+   is a rough heuristic that may drift as Anthropic adjusts quotas. No action needed today, but
+   worth revisiting if users report inaccurate fallback readings.
+
+### Shellcheck Status
+All 6 scripts clean after fixes.
+
 ## 2026-03-20: Integration Testing + Full Audit
 
 ### Integration Tests (all passing)
