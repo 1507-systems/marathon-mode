@@ -195,8 +195,11 @@ fi
 # ---------------------------------------------------------------------------
 
 if [[ -n "$REGISTRY_FILE" && -f "$REGISTRY_FILE" ]]; then
-  # Collect all subagent JSONL paths from the registry
-  mapfile -t AGENT_JSONL_PATHS < <(jq -r '.agents[].jsonl_path // empty' "$REGISTRY_FILE" 2>/dev/null || true)
+  # Collect all subagent JSONL paths from the registry (bash 3.2 compatible — no mapfile)
+  AGENT_JSONL_PATHS=()
+  while IFS= read -r _path; do
+    [[ -n "$_path" ]] && AGENT_JSONL_PATHS+=("$_path")
+  done < <(jq -r '.agents[].jsonl_path // empty' "$REGISTRY_FILE" 2>/dev/null || true)
 
   TOTAL_MULTI_TOKENS=0
   AGENT_COUNT="${#AGENT_JSONL_PATHS[@]}"
@@ -205,7 +208,7 @@ if [[ -n "$REGISTRY_FILE" && -f "$REGISTRY_FILE" ]]; then
   for jsonl in "${AGENT_JSONL_PATHS[@]}"; do
     if [[ -f "$jsonl" ]]; then
       agent_tokens=$(
-        grep '"type":"assistant"' "$jsonl" 2>/dev/null \
+        { grep '"type":"assistant"' "$jsonl" 2>/dev/null || true; } \
           | jq -r '.message.usage.output_tokens // 0' 2>/dev/null \
           | awk '{sum+=$1} END {print (sum ? sum : 0)}'
       )
@@ -216,7 +219,7 @@ if [[ -n "$REGISTRY_FILE" && -f "$REGISTRY_FILE" ]]; then
   # Add the parent transcript tokens (counted once — not in registry)
   if [[ -f "$TRANSCRIPT_PATH" ]]; then
     parent_tokens=$(
-      grep '"type":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null \
+      { grep '"type":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null || true; } \
         | jq -r '.message.usage.output_tokens // 0' 2>/dev/null \
         | awk '{sum+=$1} END {print (sum ? sum : 0)}'
     )
@@ -271,7 +274,7 @@ fi
 
 # Sum output_tokens across all assistant messages in the transcript
 total_output_tokens=$(
-  grep '"type":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null \
+  { grep '"type":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null || true; } \
     | jq -r '.message.usage.output_tokens // 0' 2>/dev/null \
     | awk '{sum+=$1} END {print (sum ? sum : 0)}'
 )
