@@ -1,6 +1,6 @@
 ---
 description: "Quota-aware autonomous work sessions — start, tasks, status, stop, schedule"
-argument-hint: "[tasks|status|stop|schedule] [--orchestrate] [--wake-time HH:MM] [--file path] [--scan] [--source path]"
+argument-hint: "[tasks|status|stop|schedule] [--orchestrate] [--dry-run] [--wake-time HH:MM] [--file path] [--scan] [--source path]"
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Read, Write, Edit, Glob, Grep, Agent
 ---
 
@@ -12,6 +12,7 @@ Parse `$ARGUMENTS` to determine which subcommand to run. The first positional ar
 |-------|--------|
 | `/marathon` | Start advisory session |
 | `/marathon --orchestrate` | Start orchestrate session |
+| `/marathon --orchestrate --dry-run` | Show dispatch plan without running |
 | `/marathon --orchestrate --wake-time 07:30` | Overnight autonomous run |
 | `/marathon --file ./tasks.md` | Start with specific task file |
 | `/marathon tasks` | Build task list interactively |
@@ -35,6 +36,7 @@ You are starting a quota-aware autonomous work session.
 2. **Parse arguments** from `$ARGUMENTS`:
    - `--file <path>`: Path to task file (default: `.claude/marathon-tasks.md`)
    - `--orchestrate`: Enable autonomous task dispatch mode (default: advisory)
+   - `--dry-run`: Parse the task file and show what would be dispatched, then exit. No agents are dispatched, no state file is created. Only valid with `--orchestrate`.
    - `--wake-time HH:MM`: Time to stop and wind down (optional, for overnight runs)
 
 3. **Locate task file:**
@@ -119,6 +121,49 @@ Work normally — I'll warn you when to wind down.
 Announce: "Starting orchestrated execution. Reading the orchestrate skill for dispatch logic."
 
 Then read and follow the skill at `${CLAUDE_PLUGIN_ROOT}/skills/orchestrate/SKILL.md`. The skill handles task dispatch, model selection, and discipline enforcement.
+
+#### Dry-Run Mode (--orchestrate --dry-run)
+
+When `--dry-run` is passed alongside `--orchestrate`:
+
+1. **Parse the task file** and build the full dependency graph exactly as described in the orchestrate skill (Sections 1 and 2). Do NOT create a state file.
+
+2. **Classify every task:**
+   - **Dispatchable**: pending (`- [ ]`), no unmet dependencies, no `<!-- requires: -->`, no `<!-- blocked: keychain -->`.
+   - **Blocked (manual)**: has `<!-- requires: hardware|gui|verve -->`.
+   - **Blocked (keychain)**: has `<!-- blocked: keychain -->`.
+   - **Blocked (dependencies)**: has unmet `<!-- after: X -->` dependencies (X is not yet `[x]` or `[FAILED]`).
+
+3. **Determine model for each dispatchable task** using the complexity assessment rules from the orchestrate skill Section 3 (no quota downshift — dry-run assumes GREEN zone).
+
+4. **Build the dispatch tiers** — simulate the eligibility loop to determine which tasks would be dispatched first (tier 1 = tasks eligible immediately), and which would become eligible after tier 1 completes (tier 2), and so on. Use the same eligibility rules as the real dispatch loop.
+
+5. **Print the dry-run report:**
+
+```
+Marathon Dry Run
+━━━━━━━━━━━━━━━
+Dispatchable: N tasks
+Blocked (manual): N tasks
+Blocked (keychain): N tasks
+Blocked (dependencies): N tasks
+
+Dispatch order (by eligibility):
+1. [haiku] Task description (project-name)
+2. [sonnet] Task description (project-name)
+...
+
+After tier 1 completes, newly eligible:
+N. [sonnet] Task description (project-name)
+...
+
+(Repeat for further tiers if applicable)
+```
+
+   - If there are blocked tasks, list them at the end with their blocking reason.
+   - Do NOT dispatch any agents.
+   - Do NOT create `.claude/marathon.local.md`.
+   - Exit after printing the report.
 
 ---
 

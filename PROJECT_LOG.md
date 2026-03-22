@@ -270,6 +270,34 @@ All scripts clean: watchdog.sh, quota-check.sh, statusline-quota.sh
 3. Verify multi-session quota aggregation shows correct token counts in StatusLine
 4. Consider adding dry-run mode and post-run summary report (from retrospective backlog)
 
+## 2026-03-22: Dry-Run Mode + Post-Run Summary Report
+
+### Summary
+Marathon task 15/30: Added two new features: `--dry-run` flag for orchestrate mode and a post-run markdown summary report written at wind-down.
+
+### What Was Done
+
+**Feature 1 — Dry-Run Mode (`--dry-run` flag):**
+- Added `--dry-run` to the argument-hint and command table in `commands/marathon.md`
+- Added `--dry-run` to the argument parsing section (step 2) with explanation of behavior
+- Added new "Dry-Run Mode (--orchestrate --dry-run)" section after the Orchestrate Mode section
+- Dry-run: parses the task file and builds the dependency graph (no state file created, no agents dispatched)
+- Classifies all tasks: dispatchable, blocked (manual), blocked (keychain), blocked (dependencies)
+- Determines model for each dispatchable task using complexity assessment (assumes GREEN zone)
+- Simulates eligibility loop to build dispatch tiers (tier 1 = immediately eligible, tier 2 = eligible after tier 1, etc.)
+- Prints formatted report showing counts, dispatch order with models, and blocked task list
+
+**Feature 2 — Post-Run Summary Report:**
+- Added step 8 to the wind-down sequence in `skills/orchestrate/SKILL.md` Section 8
+- Report written to `.claude/marathon-report-{session_id}.md` after the final summary display
+- Report includes: session metadata (start/end/duration/mode/wake_time), task results table (description/status/model/project), quota usage from last snapshot, stall log summary (if any), and skipped tasks with reasons
+- Data sources read before temp file cleanup: stall log, quota snapshot, state file fields, task file markers
+- Stall log and quota snapshot are read before step 6 (cleanup) — ordering note is explicit in the instructions
+
+### Files Changed
+- `commands/marathon.md` — argument-hint, command table, argument parsing step 2, new dry-run section
+- `skills/orchestrate/SKILL.md` — added step 8 to wind-down sequence
+
 ## 2026-03-22: End-to-End Feature Test (P1-P5)
 
 ### Summary

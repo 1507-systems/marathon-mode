@@ -284,6 +284,64 @@ Wind-down is triggered when any of these conditions are met:
 
    Include the stall log contents if any stalls were detected during the run.
 
+8. **Write post-run summary report** to `.claude/marathon-report-{session_id}.md`:
+
+   Read the following data before writing:
+   - State file fields captured before cleanup: `started_at`, `mode`, `wake_time`, `session_id`
+   - Current UTC time for `ended_at` and duration calculation
+   - Task file: re-parse completed (`- [x]`), failed (`- [FAILED]`), WIP (`- [WIP]`), manual (`<!-- requires: -->`), keychain-blocked (`<!-- blocked: keychain -->`) tasks and their model hints
+   - Stall log at `/tmp/marathon-stall-log-{session_id}.jsonl` (if it exists, read before cleanup)
+   - Last quota snapshot at `/tmp/marathon-quota-{session_id}.json` (if it exists, read before cleanup)
+
+   Report format:
+
+   ```markdown
+   # Marathon Session Report
+
+   **Session ID:** {session_id}
+   **Mode:** {advisory|orchestrate}
+   **Started:** {started_at UTC}
+   **Ended:** {ended_at UTC}
+   **Duration:** {Xh Ym}
+   **Wake time:** {wake_time or "not set"}
+
+   ## Task Results
+
+   | # | Description | Status | Model | Project |
+   |---|-------------|--------|-------|---------|
+   | 1 | {description} | ✅ Completed | haiku | {project} |
+   | 2 | {description} | ❌ Failed | sonnet | {project} |
+   | 3 | {description} | ⏭ Skipped (manual) | — | {project} |
+   | 4 | {description} | 🔑 Skipped (keychain) | — | {project} |
+   | 5 | {description} | ⏳ Remaining | — | {project} |
+
+   **Summary:** {completed} completed, {failed} failed, {skipped_manual} skipped (manual), {skipped_keychain} skipped (keychain), {remaining} remaining
+
+   ## Quota Usage
+
+   **5-hour usage:** {five_hour_pct}%
+   **7-day usage:** {seven_day_pct}%
+   **Zone at wind-down:** {zone}
+   **Resets at:** {resets_at or "unknown"}
+
+   *(Source: {statusline|jsonl|none})*
+
+   ## Stall Log
+
+   {If no stalls: "No stalls detected during this session."}
+
+   {If stalls detected: table with columns: Task ID | Description | Stall detected at | Action taken | Retry model}
+
+   ## Skipped Tasks
+
+   {If none: "No tasks were skipped."}
+
+   {If any manual/keychain tasks: list each with reason}
+   - **{description}** — Skipped: {manual (requires: gui/verve/hardware) | keychain locked}
+   ```
+
+   After writing the report, output: `Report written to .claude/marathon-report-{session_id}.md`
+
 ## 9. Resuming a Previous Session
 
 When the orchestrator starts, check for signs of a previous session:
