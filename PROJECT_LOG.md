@@ -412,3 +412,16 @@ Full audit cycle (documentation, functionality, cleanup, security) after P1-P5 i
 - All documentation accurate and consistent
 - Security audit clean
 - Tagged: v1.1.0-audit-clean
+
+## 2026-03-22: CI Setup
+
+### Summary
+Added GitHub Actions CI workflow with shellcheck linting. Set branch protection on main.
+
+### What Was Done
+- Created `.github/workflows/ci.yml` — shellcheck on all `.sh` files, runs on push/PR to main
+- Branched `feat/setup-ci`, committed, pushed, opened PR #1
+- Applied branch protection to main: required PR reviews (0 approvers), strict status checks, no force-push, no deletion
+
+### PR
+https://github.com/1507-systems/marathon-mode/pull/1
