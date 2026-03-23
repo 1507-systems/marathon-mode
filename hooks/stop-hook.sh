@@ -13,7 +13,12 @@
 #   outputs JSON { "decision": "block", "reason": "...", "systemMessage": "..." }
 #     when blocking the stop signal to continue with next task.
 
-set -euo pipefail
+set -uo pipefail
+# NOTE: Do NOT use set -e here. The jq calls below can fail when stdin is
+# empty or malformed (e.g., Claude Code passes no JSON to the Stop hook in
+# some exit paths). With set -e, jq failure causes an immediate silent exit
+# with a non-zero code, producing "Failed with non-blocking status code: No
+# stderr output" in Claude Code. Removing -e lets the || fallbacks work.
 
 # ---------------------------------------------------------------------------
 # Read and parse hook input from stdin
@@ -21,10 +26,10 @@ set -euo pipefail
 
 INPUT="$(cat)"
 
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""')"
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo "")"
 # shellcheck disable=SC2034  # TRANSCRIPT_PATH: parsed per hook contract; reserved for future quota cross-checking
-TRANSCRIPT_PATH="$(echo "$INPUT" | jq -r '.transcript_path // ""')"
-CWD="$(echo "$INPUT" | jq -r '.cwd // ""')"
+TRANSCRIPT_PATH="$(echo "$INPUT" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")"
+CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2>/dev/null || echo "")"
 
 # Fall back to process cwd if not provided
 if [[ -z "$CWD" ]]; then
