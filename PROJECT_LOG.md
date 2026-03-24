@@ -1,3 +1,4 @@
+<!-- summary: Quota-aware autonomous work session manager for Claude Code. -->
 # Marathon Mode — Project Log
 
 ## 2026-03-20: Initial Implementation
