@@ -47,7 +47,15 @@ fi
 # ---------------------------------------------------------------------------
 FRONTMATTER=$(awk '/^---/{if(found) exit; found=1; next} found{print}' "$STATE_FILE")
 
+# ---------------------------------------------------------------------------
+# Early exit if marathon is not active — prevents grep failures below
+# ---------------------------------------------------------------------------
+if echo "$FRONTMATTER" | grep -qE "^[[:space:]]*active[[:space:]]*:[[:space:]]*false"; then
+  exit 0
+fi
+
 # Helper: extract a single key value from frontmatter
+# Uses `|| true` to prevent grep exit 1 from killing the script under set -e
 _parse_key() {
   local key="$1"
   echo "$FRONTMATTER" \
@@ -55,7 +63,8 @@ _parse_key() {
     | head -n1 \
     | sed -E "s/^[[:space:]]*${key}[[:space:]]*:[[:space:]]*//" \
     | sed -E "s/[[:space:]]*$//" \
-    | sed -E "s/^['\"]|['\"]$//g"
+    | sed -E "s/^['\"]|['\"]$//g" \
+    || true
 }
 
 STATE_SESSION_ID=$(_parse_key "session_id")
