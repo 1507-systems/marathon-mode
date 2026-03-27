@@ -426,3 +426,32 @@ Added GitHub Actions CI workflow with shellcheck linting. Set branch protection 
 
 ### PR
 https://github.com/1507-systems/marathon-mode/pull/1
+
+## 2026-03-27: Re-Audit (v1.2.0)
+
+### Summary
+Read-only re-audit covering 7 commits since v1.1.0-audit-clean. All checks pass.
+
+### Changes Since v1.1.0-audit-clean
+- `.github/workflows/ci.yml` — new CI workflow (shellcheck on push/PR to main)
+- `hooks/quota-monitor.sh` — early exit when marathon inactive, `|| true` on grep to prevent set -e failures
+- `hooks/stop-hook.sh` — removed `set -e` (documented why), added `2>/dev/null || echo ""` fallbacks on jq calls
+- `PROJECT_LOG.md` — CI setup entry, summary marker
+
+### Audit Results
+
+**Shellcheck:** All 7 scripts clean (quota-monitor.sh, stop-hook.sh, quota-check.sh, statusline-quota.sh, notify.sh, generate-schedule.sh, watchdog.sh)
+
+**Secrets/Tokens:** None hardcoded. All credential references are generic keychain service names.
+
+**Private Data (PUBLIC repo):** Clean. One "Bryce" (first name) in retrospective doc — acceptable.
+
+**TODO/FIXME/HACK:** Only in documentation describing the task-scanning feature. No actual code debt.
+
+**CI Note:** `ci.yml` shellcheck uses `|| true`, making failures non-blocking. Not a security concern but reduces CI value. Documented for future improvement.
+
+### Final State
+- 23 tracked files, all clean
+- All scripts shellcheck-clean
+- No secrets or private data
+- Tagged: v1.2.0-audit-clean
