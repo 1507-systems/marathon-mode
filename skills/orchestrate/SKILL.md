@@ -204,10 +204,11 @@ Every subagent prompt MUST have these rules appended, verbatim:
 
 ```
 MARATHON DISCIPLINE RULES:
-1. Commit your changes before finishing — do not leave uncommitted work.
-2. Update PROJECT_LOG.md with what you did — include what changed and why.
-3. Only work on this specific task — do not start other tasks or "while I'm here" fixes.
-4. If blocked, document the blocker in the task file and complete without resolving it.
+1. Read before you write — ALWAYS read every file you plan to modify before making changes. Never generate fixes from task descriptions alone. Verify the current state of the code first.
+2. Commit your changes before finishing — do not leave uncommitted work.
+3. Update PROJECT_LOG.md with what you did — include what changed and why.
+4. Only work on this specific task — do not start other tasks or "while I'm here" fixes.
+5. If blocked, document the blocker in the task file and complete without resolving it.
 ```
 
 These rules prevent scope creep, ensure traceability, and keep the task file accurate.
