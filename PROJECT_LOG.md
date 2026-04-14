@@ -1,6 +1,24 @@
 <!-- summary: Quota-aware autonomous work session manager for Claude Code. -->
 # Marathon Mode — Project Log
 
+## 2026-04-13 — Re-Audit (Batch)
+
+### Summary
+Routine audit pass. Shell scripts pass shellcheck. Keychain references are intentional (marathon-mode manages headless keychain unlock for subagents). No changes needed.
+
+### What Was Audited
+- shellcheck: all scripts and hooks — clean
+- Hardcoded secrets: none
+- TODO/FIXME/HACK: none
+- Keychain references: extensive but intentional — marathon-mode's keychain pre-unlock feature is a core capability for headless autonomous runs. These are not stale references.
+
+### Final State
+- Code: clean
+- Documentation: accurate
+- Security: no issues
+
+---
+
 ## 2026-03-20: Initial Implementation
 
 ### Summary
