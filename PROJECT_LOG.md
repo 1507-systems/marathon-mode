@@ -472,4 +472,4 @@ Read-only re-audit covering 7 commits since v1.1.0-audit-clean. All checks pass.
 - 23 tracked files, all clean
 - All scripts shellcheck-clean
 - No secrets or private data
-- Tagged: v1.2.0-audit-clean
+- Tagged: v1.2.1-audit-clean
