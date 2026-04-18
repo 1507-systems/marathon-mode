@@ -1,6 +1,14 @@
 <!-- summary: Quota-aware autonomous work session manager for Claude Code. -->
 # Marathon Mode — Project Log
 
+## 2026-04-17 — Fix plan doc relocated from dev root
+
+Moved `~/dev/marathon-fix-plan.md` (2026-04-12 fresh-eyes code review of coffer, wicket, infra-console) into `docs/plans/2026-04-12-marathon-fix-plan.md`. The file was sitting orphaned at the dev-folder root; now filed alongside the existing `improvement-plan.md` under `docs/plans/`.
+
+**Source:** `~/dev/marathon-fix-plan.md`
+**Destination:** `docs/plans/2026-04-12-marathon-fix-plan.md`
+**Operation:** Move (not copy).
+
 ## 2026-04-13 — Re-Audit (Batch)
 
 ### Summary
